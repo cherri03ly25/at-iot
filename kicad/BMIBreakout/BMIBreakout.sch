@@ -1,0 +1,256 @@
+EESchema Schematic File Version 4
+LIBS:BMIBreakout-cache
+EELAYER 26 0
+EELAYER END
+$Descr A4 11693 8268
+encoding utf-8
+Sheet 1 1
+Title ""
+Date ""
+Rev ""
+Comp ""
+Comment1 ""
+Comment2 ""
+Comment3 ""
+Comment4 ""
+$EndDescr
+$Comp
+L BMI055:BMI055 IC1
+U 1 1 5B45B061
+P 5750 3200
+F 0 "IC1" H 5750 4267 50  0000 C CNN
+F 1 "BMI055" H 5750 4176 50  0000 C CNN
+F 2 "BMI055:QFN50P300X450X100-16N" H 5750 3200 50  0001 L BNN
+F 3 "BMI055" H 5750 3200 50  0001 L BNN
+F 4 "3.97 USD" H 5750 3200 50  0001 L BNN "Field4"
+F 5 "LGA-16 Bosch" H 5750 3200 50  0001 L BNN "Field5"
+F 6 "Bosch" H 5750 3200 50  0001 L BNN "Field6"
+F 7 "BMI055 6 Axis Inertial Sensor _12 Bit Acceleration Sensor + Gyroscope_ 3 x 4 mm" H 5750 3200 50  0001 L BNN "Field7"
+F 8 "Good" H 5750 3200 50  0001 L BNN "Field8"
+	1    5750 3200
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	6350 2600 7600 2600
+Wire Wire Line
+	7600 2600 7600 2800
+Wire Wire Line
+	7600 2600 7600 2150
+Connection ~ 7600 2600
+$Comp
+L Device:C C1
+U 1 1 5B45B374
+P 7600 2950
+F 0 "C1" H 7715 2996 50  0000 L CNN
+F 1 "100nF" H 7715 2905 50  0000 L CNN
+F 2 "Capacitor_SMD:C_0805_2012Metric" H 7638 2800 50  0001 C CNN
+F 3 "~" H 7600 2950 50  0001 C CNN
+	1    7600 2950
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	6350 2500 8050 2500
+Wire Wire Line
+	8050 2500 8050 2800
+Wire Wire Line
+	8050 2500 8050 2100
+Connection ~ 8050 2500
+$Comp
+L Device:C C2
+U 1 1 5B45B467
+P 8050 2950
+F 0 "C2" H 8165 2996 50  0000 L CNN
+F 1 "100nF" H 8165 2905 50  0000 L CNN
+F 2 "Capacitor_SMD:C_0805_2012Metric" H 8088 2800 50  0001 C CNN
+F 3 "~" H 8050 2950 50  0001 C CNN
+	1    8050 2950
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	7600 3100 7600 3200
+Wire Wire Line
+	7600 3200 8050 3200
+Wire Wire Line
+	8050 3100 8050 3200
+Wire Wire Line
+	8050 3200 8050 3400
+Connection ~ 8050 3200
+$Comp
+L power:GND #PWR0101
+U 1 1 5B45B65B
+P 8050 3400
+F 0 "#PWR0101" H 8050 3150 50  0001 C CNN
+F 1 "GND" H 8055 3227 50  0000 C CNN
+F 2 "" H 8050 3400 50  0001 C CNN
+F 3 "" H 8050 3400 50  0001 C CNN
+	1    8050 3400
+	1    0    0    -1  
+$EndComp
+Text Label 8050 2100 0    50   ~ 0
+VDD
+Text Label 7600 2150 0    50   ~ 0
+VDDIO
+Wire Wire Line
+	6350 4200 6650 4200
+Wire Wire Line
+	6350 4300 6650 4300
+Wire Wire Line
+	6650 4200 6650 4300
+Wire Wire Line
+	6650 4300 6850 4300
+Connection ~ 6650 4300
+$Comp
+L power:GND #PWR0102
+U 1 1 5B45B8B8
+P 6850 4300
+F 0 "#PWR0102" H 6850 4050 50  0001 C CNN
+F 1 "GND" V 6855 4172 50  0000 R CNN
+F 2 "" H 6850 4300 50  0001 C CNN
+F 3 "" H 6850 4300 50  0001 C CNN
+	1    6850 4300
+	0    -1   -1   0   
+$EndComp
+Wire Wire Line
+	6350 3100 6650 3100
+Wire Wire Line
+	6350 3200 6650 3200
+Text Label 6650 3100 0    50   ~ 0
+INT1
+Text Label 6650 3200 0    50   ~ 0
+INT2
+Wire Wire Line
+	5150 3800 4800 3800
+Wire Wire Line
+	5150 3900 4800 3900
+Text Label 4800 3800 0    50   ~ 0
+INT3
+Text Label 4800 3900 0    50   ~ 0
+INT4
+Wire Wire Line
+	6350 3400 6500 3400
+Wire Wire Line
+	6350 3500 6500 3500
+Wire Wire Line
+	6500 3400 6500 3500
+Wire Wire Line
+	6500 3500 6650 3500
+Connection ~ 6500 3500
+Text Label 6650 3500 0    50   ~ 0
+SDO
+Wire Wire Line
+	5150 3200 4800 3200
+Wire Wire Line
+	5150 3300 4800 3300
+Text Label 4800 3200 0    50   ~ 0
+CSB1
+Text Label 4800 3300 0    50   ~ 0
+CSB2
+Wire Wire Line
+	5150 3600 4800 3600
+Wire Wire Line
+	5150 3000 4800 3000
+Text Label 4800 3000 0    50   ~ 0
+SCK
+Wire Wire Line
+	5150 2900 4800 2900
+Text Label 4800 2900 0    50   ~ 0
+PS
+Text Label 4800 3600 0    50   ~ 0
+SDI
+$Comp
+L Connector_Generic:Conn_01x07 J1
+U 1 1 5B46335D
+P 2500 2700
+F 0 "J1" H 2420 2175 50  0000 C CNN
+F 1 "Conn_01x07" H 2420 2266 50  0000 C CNN
+F 2 "Connector_PinSocket_2.54mm:PinSocket_1x07_P2.54mm_Vertical" H 2500 2700 50  0001 C CNN
+F 3 "~" H 2500 2700 50  0001 C CNN
+	1    2500 2700
+	-1   0    0    1   
+$EndComp
+Wire Wire Line
+	2700 3000 3000 3000
+Wire Wire Line
+	2700 2900 3000 2900
+Wire Wire Line
+	2700 2800 3000 2800
+Wire Wire Line
+	2700 2700 3000 2700
+Wire Wire Line
+	2700 2600 3000 2600
+Wire Wire Line
+	2700 2500 3000 2500
+Wire Wire Line
+	2700 2400 3000 2400
+$Comp
+L Connector_Generic:Conn_01x07 J2
+U 1 1 5B468807
+P 2500 3650
+F 0 "J2" H 2420 3125 50  0000 C CNN
+F 1 "Conn_01x07" H 2420 3216 50  0000 C CNN
+F 2 "Connector_PinSocket_2.54mm:PinSocket_1x07_P2.54mm_Vertical" H 2500 3650 50  0001 C CNN
+F 3 "~" H 2500 3650 50  0001 C CNN
+	1    2500 3650
+	-1   0    0    1   
+$EndComp
+Wire Wire Line
+	2700 3350 3000 3350
+Wire Wire Line
+	2700 3450 3000 3450
+Wire Wire Line
+	2700 3550 3000 3550
+Wire Wire Line
+	2700 3650 3000 3650
+Wire Wire Line
+	2700 3750 3000 3750
+Wire Wire Line
+	2700 3850 3000 3850
+Wire Wire Line
+	2700 3950 3000 3950
+Text Label 3000 3950 0    50   ~ 0
+SDO
+Text Label 3000 3850 0    50   ~ 0
+CSB1
+Text Label 3000 3650 0    50   ~ 0
+INT3
+Text Label 3000 3550 0    50   ~ 0
+SDI
+Text Label 3000 3450 0    50   ~ 0
+SCK
+Text Label 3000 3000 0    50   ~ 0
+INT1
+Text Label 3000 2900 0    50   ~ 0
+INT2
+Text Label 3000 2800 0    50   ~ 0
+VDD
+$Comp
+L power:GND #PWR0103
+U 1 1 5B475B98
+P 3000 2700
+F 0 "#PWR0103" H 3000 2450 50  0001 C CNN
+F 1 "GND" V 3005 2572 50  0000 R CNN
+F 2 "" H 3000 2700 50  0001 C CNN
+F 3 "" H 3000 2700 50  0001 C CNN
+	1    3000 2700
+	0    -1   -1   0   
+$EndComp
+Text Label 3000 2600 0    50   ~ 0
+CSB2
+Text Label 3000 2500 0    50   ~ 0
+PS
+Text Label 3000 2400 0    50   ~ 0
+VDDIO
+Text Label 3000 3750 0    50   ~ 0
+INT4
+$Comp
+L power:GND #PWR0104
+U 1 1 5B477278
+P 3000 3350
+F 0 "#PWR0104" H 3000 3100 50  0001 C CNN
+F 1 "GND" V 3005 3222 50  0000 R CNN
+F 2 "" H 3000 3350 50  0001 C CNN
+F 3 "" H 3000 3350 50  0001 C CNN
+	1    3000 3350
+	0    -1   -1   0   
+$EndComp
+$EndSCHEMATC

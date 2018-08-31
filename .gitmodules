@@ -1,0 +1,9 @@
+[submodule "firmware\\drv\\bme280\\bme280_driver"]
+	path = firmware\\drv\\bme280\\bme280_driver
+	url = https://github.com/BoschSensortec/BME280_driver.git
+[submodule "firmware\\drv\\bmi055\\bmg160_driver"]
+	path = firmware\\drv\\bmi055\\bmg160_driver
+	url = https://github.com/BoschSensortec/BMG160_driver.git
+[submodule "firmware\\drv\\bmi055\\bma2x2_driver"]
+	path = firmware\\drv\\bmi055\\bma2x2_driver
+	url = https://github.com/BoschSensortec/BMA2x2_driver.git

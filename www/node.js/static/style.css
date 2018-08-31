@@ -1,0 +1,99 @@
+button {
+	height: 50px;
+}
+
+body {
+	display: flex;
+	flex-direction: row;
+	padding: 0px;
+	margin: 0px;
+	overflow: hidden;
+}
+
+#canvasContainer {
+	display: flex;
+	flex-direction: column;
+	position: relative;
+}
+
+.atsb-list {
+	padding: 0;
+	border: solid #a52300;
+	background-color: #663333;
+	border-width: 0px 5px 5px 15px;
+	display: flex;
+	flex-direction: column;
+}
+
+.atsb-list-label {
+	flex: 0 0 auto;
+	margin-right: 30px;
+	font: inherit;
+}
+
+.atsb-list-inner {
+	overflow: auto;
+	flex: 1 1 auto;
+}
+
+.atsb-list-header {
+	flex-direction: row;
+	margin: 0px -5px 0px -15px;
+	padding: 10px 10px 10px 25px;
+	background-color: #b92300;
+	color: white;
+	font: large "Arial Black";
+	flex: 0 0 auto;
+}
+
+.atsb-device {
+	margin: 3px;
+	padding: 3px 5px 3px 5px;
+	background-color: #b5a3a3;
+	border-radius: 10px;
+	color: white;
+	padding: 10px;
+	display: block;
+}
+
+.atsb-device-header {
+	padding: 3px 3px 3px 8px;
+	font: medium "Arial Black";
+	color: black;
+}
+
+.atsb-sensor {
+	display: inline-block;
+	padding: 5px;
+	margin: 3px;
+	width: 93%;
+	height: 40px;
+	border-radius: 5px;
+	background-color: #b92300;
+}
+
+.atsb-style-indicator {
+	margin: 4px 6px 2px 5px;
+	display: inline-block;
+	/* width: 15px; */
+	/* height: 15px; */
+	border-radius: 50%;
+	border: black solid thin;
+	vertical-align: middle;
+	padding: 6px;
+}
+
+.atsb-label {
+	font: medium "Arial";
+	vertical-align: middle;
+	margin-top: 8px;
+}
+
+canvas {
+	border: thin solid black;
+	margin: unset;
+	margin: 0.1%;
+	width: 99.9%;
+	height: 49.9%;
+	flex: 0 0 auto;
+}

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<!---------------------------------------------------------
+ 	This source code is licensed under the MIT license.
+	See LICENSE in the project root folder for more info.
+----------------------------------------------------------->
+<html>
+	<head>
+		<title>Protopaja</title>
+		<script src="/socket.io/socket.io.js"></script>
+		<script src="/atsb/atsb.js"></script>
+		<link rel="stylesheet" type="text/css" href="/atsb/style.css" />
+	</head>
+
+	<body>
+		<script>
+			var atsb = initATSB();
+			var list = atsb.newDeviceList();
+			document.body.appendChild(list);
+			list.style.width = "25vw";
+			list.style.height = "100vh";
+			
+			var div = document.createElement("div");
+			div.id = "canvasContainer";
+			div.style.width = "75vw";
+			div.style.height = "100vh";
+			
+			document.body.appendChild(div);
+			
+			var c1 = atsb.newCanvas();
+			var c2 = atsb.newCanvas();
+			div.appendChild(c1);
+			div.appendChild(c2);
+				
+			var btn = document.createElement("button");
+			btn.classList.add("atsb-reset-btn");
+			btn.innerHTML = "Reset";
+			btn.onclick = ()=>{
+				c1.reset();
+				c2.reset();
+			};
+			list.header.appendChild(btn);
+			
+			var spacing = {
+				horizontal: 1/4,
+				vertical: 1/8
+			}
+			
+			setInterval(()=>{
+				if(c1.width != c1.offsetWidth)
+					c1.width = c1.offsetWidth;
+				if(c1.height != c1.offsetHeight)
+					c1.height = c1.offsetHeight;
+			
+				if(c2.width != c2.offsetWidth)
+					c2.width = c2.offsetWidth;
+				if(c2.height != c2.offsetHeight)
+					c2.height = c2.offsetHeight;
+			}, 100);
+			c1.lineSpacing = spacing;
+			c2.lineSpacing = spacing;
+			
+			c1.reset();
+			c2.reset();
+		</script>
+	</body>
+</html>

@@ -1,0 +1,29 @@
+{
+  "name": "iot-stream-monitor",
+  "version": "0.1.0",
+  "description": "A simple websockets stream, that broadcasts sensor data from Azure IoT Hub.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Test command not defined.\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/cherri03ly25/Protopaja2018_Tuxera.git"
+  },
+  "keywords": [
+    "iot",
+    "stream"
+  ],
+  "author": "Veli-Matti Rantanen <vellu.rantanen@hotmail.com>",
+  "contibutors": [],
+  "license": "MIT",
+  "private": true,
+  "bugs": {
+    "url": "https://github.com/cherri03ly25/Protopaja2018_Tuxera/issues"
+  },
+  "homepage": "https://github.com/cherri03ly25/Protopaja2018_Tuxera#readme",
+  "dependencies": {
+    "express": "^4.16.3",
+    "socket.io": "^2.1.1"
+  }
+}

@@ -1,0 +1,32 @@
+{
+	"urlPrefix" 		:	"/atsb",
+	"urlEndpoint" 		: "/endpoint/webhook/",
+	"namespace"			:	"atsb",
+	"defaultParser"		: "./parser.js",
+	
+	"logging" : {
+		"enabled" 		: true,
+		"events" 		: ["Warning", "Error"],
+		"prefix" 		: "[ATSB] <$TIME> $TYPE: ",
+		"postfix" 		: "",
+		"interval" 		: 60
+	},
+	
+	"storage" : {
+		"enabled" 		: false,
+		"prefix" 		: "$DIRNAME/var/atsb/",
+		"cachePath" 	: "/cache/:YYYY/:MM/:DD/:hh:mm",
+		"exitSave" 		: true,
+		"devices" 		: "devices.json",
+		"sensors" 		: "sensors.json",
+		"users" 		: "users.json",
+		"encryption" : {
+			"enabled" 	: false,
+			"keyMethod" : "stdin",
+			"key" 		: "",
+			"algorithm" : "aes-256",
+			"encoding" 	: "base64"
+		},
+		"compression" 	: true
+	}
+}

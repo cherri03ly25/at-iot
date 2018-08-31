@@ -1,0 +1,3 @@
+(sym_lib_table
+  (lib (name NanoTesting-rescue)(type Legacy)(uri ${KIPRJMOD}/NanoTesting-rescue.lib)(options "")(descr ""))
+)

@@ -1,0 +1,59 @@
+{
+	"0000": [{	
+				"signed": true, "name": "BME Temperature",
+				"precision": 0.01, "color": "red"
+			},{	
+				"name": "BME Humidity",
+				"precision": 0.01, "color": "cyan"
+			}],
+	"0001": [{
+				"size": 32, "name": "BME Pressure", 
+				"precision": 0.0001, "color": "black"
+			}],
+	"0002": [{	
+				"name": "APDS Red", "color": "red"
+			},{	
+				"name": "APDS Green", "color": "green"
+			}],
+	"0003": [{	
+				"name": "APDS Blue", "color": "blue"
+			},{	
+				"name": "APDS Clear", "color": "orange"
+			}],
+	"0004": [{	
+				"signed": true, "name": "BMI Rotation (x)",
+				"precision": 0.01, "color": "magenta"
+			},{	
+				"signed": true, "name": "BMI Rotation (y)",
+				"precision": 0.01, "color": "lime"
+			}],
+	"0005": [{	
+				"signed": true, "name": "BMI Rotation (z)",
+				"precision": 0.01, "color": "cyan"
+			},{	
+				"signed": true, "name": "Internal Temp.",
+				"precision": 0.01, "color": "maroon"
+			}],
+	"0006": [{	
+				"signed": true, "name": "BMI Acceleration (x)",
+				"precision": 0.00025, "color": "red"
+			},{	
+				"signed": true, "name": "BMI Acceleration (y)",
+				"precision": 0.00025, "color": "green"
+			}],
+			
+	"0007": [{	
+				"signed": true, "name": "BMI Acceleration (z)", 
+				"precision": 0.00025, "color": "blue"
+			},{	
+				"size": 8, "name": "APDS Proximity", "color": "black"
+			},{
+				"size": 8, "name": "APDS Gesture", "color": "orange"
+			}],
+			
+	"FFFF": [{	
+				"signed": true,	"name": "Test Sensor #1", "color": "red"
+			},{	
+				"signed": true, "name": "Test Sensor #2", "color": "blue"
+			}]
+}
