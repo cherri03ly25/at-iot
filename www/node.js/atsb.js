@@ -128,7 +128,7 @@ module.exports = function (opt={}, ...services) {
 		var p = getParserFor(msg);
 		if (p) {
 			var data = p.parse(msg, msgId);
-			if (data.length) {
+			if (data && data.length) {
 				atsb.emit("Info", "MessageParsed", 
 						`Parsed ${data.length} readings. (${msgId})`,
 						msgId, data.length);
@@ -211,7 +211,10 @@ module.exports = function (opt={}, ...services) {
 				 **/
 				function flushCache(room) {
 					var data = getCached(room);
-					if (data) socket.emit("Data", data);
+					if (data) {
+						console.log("Flushed cache from " + room);
+						socket.emit("Data", ...data);
+					}
 				}
 				
 				atsb.emit("Info", "ClientConnected", 
@@ -224,13 +227,14 @@ module.exports = function (opt={}, ...services) {
 				atsb.connections++;
 			
 				/* Handle client subscribing to a list of rooms */
-				socket.on("Subscribe", rooms=>{
+				socket.on("Subscribe", (...rooms)=>{
+					console.log(rooms);
 					socket.join(rooms);
 					rooms.forEach(flushCache);
 				});
 				
 				/* Handle client unsubscribing a list of rooms */
-				socket.on("Unsubscribe", rooms=>socket.leave(rooms));
+				socket.on("Unsubscribe", (...rooms)=>socket.leave(rooms));
 				
 				/* Handle client requesting data */
 				if (socket.permissions.loadCache) {
@@ -291,7 +295,7 @@ module.exports = function (opt={}, ...services) {
 			//FIXME: NO POST AUTHENTICATION
 			/* Compute an id to track the message in logs */
 			var msgId = hash(JSON.stringify(req.body)).slice(0,8);
-			atsb.emit("Info", "PostReceived", `Received a POST request (${msgHash})`, 
+			atsb.emit("Info", "PostReceived", `Received a POST request (${msgId})`, 
 							msgId, req.body.length);
 			/* Parse the data */
 			var data = parseMessage(req.body, msgId);
@@ -303,8 +307,10 @@ module.exports = function (opt={}, ...services) {
 					atsb.nsp.in(msg.id).emit("Data", msg);
 				});
 				atsb.emit("Info", "StreamedData", 
-					`Streamed the data from '${msgHash}'`, msgId);
+					`Streamed the data from '${msgId}'`, msgId);
 			}
+			
+			res.status(200).send();
 		});
 	};
 	

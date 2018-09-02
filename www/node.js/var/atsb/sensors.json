@@ -1,59 +1,59 @@
 {
 	"0000": [{	
 				"signed": true, "name": "BME Temperature",
-				"precision": 0.01, "color": "red"
+				"precision": 0.01, "style": "red"
 			},{	
 				"name": "BME Humidity",
-				"precision": 0.01, "color": "cyan"
+				"precision": 0.01, "style": "cyan"
 			}],
 	"0001": [{
 				"size": 32, "name": "BME Pressure", 
-				"precision": 0.0001, "color": "black"
+				"precision": 0.0001, "style": "black"
 			}],
 	"0002": [{	
-				"name": "APDS Red", "color": "red"
+				"name": "APDS Red", "style": "red"
 			},{	
-				"name": "APDS Green", "color": "green"
+				"name": "APDS Green", "style": "green"
 			}],
 	"0003": [{	
-				"name": "APDS Blue", "color": "blue"
+				"name": "APDS Blue", "style": "blue"
 			},{	
-				"name": "APDS Clear", "color": "orange"
+				"name": "APDS Clear", "style": "orange"
 			}],
 	"0004": [{	
 				"signed": true, "name": "BMI Rotation (x)",
-				"precision": 0.01, "color": "magenta"
+				"precision": 0.01, "style": "magenta"
 			},{	
 				"signed": true, "name": "BMI Rotation (y)",
-				"precision": 0.01, "color": "lime"
+				"precision": 0.01, "style": "lime"
 			}],
 	"0005": [{	
 				"signed": true, "name": "BMI Rotation (z)",
-				"precision": 0.01, "color": "cyan"
+				"precision": 0.01, "style": "cyan"
 			},{	
 				"signed": true, "name": "Internal Temp.",
-				"precision": 0.01, "color": "maroon"
+				"precision": 0.01, "style": "maroon"
 			}],
 	"0006": [{	
 				"signed": true, "name": "BMI Acceleration (x)",
-				"precision": 0.00025, "color": "red"
+				"precision": 0.00025, "style": "red"
 			},{	
 				"signed": true, "name": "BMI Acceleration (y)",
-				"precision": 0.00025, "color": "green"
+				"precision": 0.00025, "style": "green"
 			}],
 			
 	"0007": [{	
 				"signed": true, "name": "BMI Acceleration (z)", 
-				"precision": 0.00025, "color": "blue"
+				"precision": 0.00025, "style": "blue"
 			},{	
-				"size": 8, "name": "APDS Proximity", "color": "black"
+				"size": 8, "name": "APDS Proximity", "style": "black"
 			},{
-				"size": 8, "name": "APDS Gesture", "color": "orange"
+				"size": 8, "name": "APDS Gesture", "style": "orange"
 			}],
 			
 	"FFFF": [{	
-				"signed": true,	"name": "Test Sensor #1", "color": "red"
+				"signed": true,	"name": "Test Sensor #1", "style": "red"
 			},{	
-				"signed": true, "name": "Test Sensor #2", "color": "blue"
+				"signed": true, "name": "Test Sensor #2", "style": "blue"
 			}]
 }

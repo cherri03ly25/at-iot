@@ -26,10 +26,10 @@
 			
 			document.body.appendChild(div);
 			
-			var c1 = atsb.newCanvas();
-			var c2 = atsb.newCanvas();
-			div.appendChild(c1);
-			div.appendChild(c2);
+			var c1 = atsb.createCanvas();
+			var c2 = atsb.createCanvas();
+			div.appendChild(c1.element);
+			div.appendChild(c2.element);
 				
 			var btn = document.createElement("button");
 			btn.classList.add("atsb-reset-btn");
@@ -39,21 +39,6 @@
 				c2.reset();
 			};
 			list.header.appendChild(btn);
-			
-			setInterval(()=>{
-				if(c1.width != c1.offsetWidth)
-					c1.width = c1.offsetWidth;
-				if(c1.height != c1.offsetHeight)
-					c1.height = c1.offsetHeight;
-			
-				if(c2.width != c2.offsetWidth)
-					c2.width = c2.offsetWidth;
-				if(c2.height != c2.offsetHeight)
-					c2.height = c2.offsetHeight;
-			}, 100);
-			
-			c1.reset();
-			c2.reset();
 		</script>
 	</body>
 </html>

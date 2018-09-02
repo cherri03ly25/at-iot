@@ -13,7 +13,7 @@
 
 const ATSBDefaultOptions = {
 		namespace: "/atsb",
-		paintInterval: 50,
+		refreshRate: 60,
 		timeScope: 60
 }
 
@@ -21,7 +21,7 @@ function initATSB(opt={}, query={}) {
 	var opt = {...ATSBDefaultOptions, ...opt};
 	
 	var devices = {};
-	var cache = {};
+	var streams = {};
 	var subscriptions = [];
 	
 	/* Connect to namespace */
@@ -30,112 +30,203 @@ function initATSB(opt={}, query={}) {
 	/* Export variables */
 	atsb.devices = devices;
 	atsb.opt = opt;
+	atsb.streams = streams;
+	
+	/* Class to manage the data streams */
+	class Stream {
+		constructor(id, name, style) {
+			this.id 		= id;		// Sensor identifier
+			this.name 		= name;		// Sensor name
+			this.style 		= style;	// Graph style
+			this.viewers 	= {};		// Viewer ids, and callbacks to remove them.
+			this.streaming 	= false;	// Whether receiving data or not
+			this.maxIdx 	= 0;		// Index of max value
+			this.minIdx 	= 0;		// Index of min value
+			this.maxSize	= 600;		// A "soft" limit on the size of the array.
+			this.cache 		= [];		// Cached data points
+			
+			console.log("New stream: " + this.id);
+			
+			setInterval(()=>this.clean(), 15000);
+		}
+		
+		/**
+		 *@brief	Get the minimum value.
+		 **/
+		get minValue() {
+			return this.min().value;
+		}
+		
+		/**
+		 *@brief	Get the maximum value.
+		 **/
+		get maxValue() {
+			return this.max().value;
+		}
+		
+		/**
+		 *@brief	Get the point with the lowest value
+		 **/
+		min() {
+			if(this.cache.length > this.minIdx)
+				return this.cache[this.minIdx];
+			else
+				return 0;
+		}
+		
+		/**
+		 *@brief	Get the point with the highest value
+		 **/
+		max() {
+			if(this.cache.length > this.maxIdx)
+				return this.cache[this.maxIdx];
+			else
+				return 0;
+		}
+		
+		/**
+		 *@brief	Sort the cache newest to oldest
+		 **/
+		sort() {
+			this.cache.sort((a,b)=>(b.time-a.time));
+		}
+		
+		/**
+		 *@brief	Enter points into the cache
+		 **/
+		receive(...points) {
+			this.cache.unshift(...points);
+			this.recalcMinMax();
+		}
+		
+		/**
+		 *@brief 	Recalculate the min/max values
+		 **/
+		recalcMinMax() {
+			var max = 0;
+			var min = 0;
+			for (var i in this.cache) {
+				if (this.cache[i].value < this.cache[min].value)
+					min = i;
+				if (this.cache[i].value > this.cache[max].value)
+					max = i;
+			}
+			this.maxIdx = max;
+			this.minIdx = min;
+		}
+		
+		/**
+		 *@brief	Reset the stream.
+		 *@detail	The stream is stopped, the viewers removed and data discarded.
+		 **/
+		reset() {
+			this.stop();
+			this.cache.length = 0;
+			for (var unwatch of this.viewers) unwatch();
+		}
+		
+		/**
+		 *@brief	Reduce the size of the data array if needed.
+		 *@detail	The size of the array is reduced only if data is being
+		 *			streamed, and it exceeds maxSize by at least 10%.
+		 **/
+		clean() {
+			if (this.streaming && this.cache.length >= 1.1 * this.maxSize)
+			{
+				this.cache.length = this.maxSize;
+				this.recalcMinMax();
+			}
+		}
+		
+		/**
+		 *@brief	Stop the stream.
+		 **/
+		stop() {
+			this.streaming = false;
+			atsb.emit("Unsubscribe", this.id);
+			console.log("Stopping stream for: " + this.id);
+		}
+		
+		/**
+		 *@brief	Starts/resumes the stream.
+		 **/
+		start() {
+			this.streaming = true;
+			atsb.emit("Subscribe", this.id);
+			console.log("Starting stream for: " + this.id);
+		}
+		
+		join(id, callback) {
+			this.viewers[id] = callback;
+			if (!this.streaming) this.start();
+		}
+		
+		leave(id) {
+			delete this.viewers[id];
+		}
+	}
+	
+	/**
+	 *@brief	Create a device.
+	 **/
+	function createDevice(dev) {
+		devices[dev.mac] = {
+			mac: dev.mac,
+			name: dev.name,
+			sensors: {}
+		};
+		
+		for (var sensor of dev.sensors) {
+			var sid = sensor.id+"@"+dev.mac;
+			streams[sid] = new Stream(sid, sensor.name, sensor.style);
+			devices[dev.mac].sensors[sid] = streams[sid];
+		}
+	}
 	
 	/* Handle the server sending a device list */
 	atsb.on("DeviceList", list=>{
-			// FIXME: There is a bug that causes references to the list to break.
-			console.log("Device list updated.");
-			console.log(list);
-			list.forEach(dev=>devices[dev.mac] = {...dev});
-			updateDeviceLists();
-		});
+		console.log("Device list updated.");
+		list.forEach(createDevice);
+		updateDeviceLists();
+	});
 	
 	/* Handle the server announcing a new device */
 	atsb.on("DeviceAdded", devInfo=>{
-			devices[devInfo.mac] = {...devInfo};
-			console.log("New device added: "+devInfo.mac);
-			updateDeviceLists();
-		});
+		createDevice(devInfo);
+		console.log("New device added: "+devInfo.mac);
+		updateDeviceLists();
+	});
 	
 	/* Handle the server announcing a changed device */
 	atsb.on("DeviceUpdated", devInfo=>{
 		console.log("Device updated: "+devInfo.mac);
 		var dev = devices[devInfo.mac];
-		dev.name = devInfo.name;
-		var ids = dev.sensors.map(s=>s.id);
-		/* Append the sensors that are not already in the list */
-		dev.sensors.push(...devInfo.sensors.filter(s=>!ids.includes(s.id)));
+		dev.name = devInfo.name; // Update name
+		/* Update sensors */
+		devInfo.sensors.forEach(s=>{
+			if (dev.sensors[s.id]) {
+				var sensor = dev.sensors[s.id];
+				sensor.name = s.name;
+				sensor.style = s.style;
+			} else {
+				dev.sensors[s.id] = new Stream(s.id, s.name, s.style);
+			}
+		});
+		
 		updateDeviceLists();
 	});
-	
-	/**
-	 *@brief 	Recalculate the min/max values for the given cache.
-	 **/
-	function recalcMinMax(che) {
-		var max = 0;
-		var min = 0;
-		for (var i in che.data) {
-			if (che.data.length > 400 && i > che.data.length-100) break;
-			if (che.data[i].value < che.data[min].value)
-				min = i;
-			if (che.data[i].value > che.data[max].value)
-				max = i;
-		}
-		che.maxIdx = max;
-		che.minIdx = min;
-	}
 	 
-	/**
-	 *@brief	Cache received messages.
-	 *@detail	Assumes that single readings are the newest
-	 *@detail	If an array is received, the cache will get sorted.
-	 *
-	 *@param	msg		Either a single reading, or an Array.
-	 **/
-	function putInCache(msg) {
-		var id = msg.id ? msg.id : msg[0].id;
-		var che = cache[id];
-		
-		/* Create the cache if needed */
-		if (!che) {
-			console.log("Initialized cache for "+id);
-			cache[id] = {
-				sensor: atsb.getByIdentifier(id),
-				maxIdx: 0,
-				minIdx: 0,
-				data: []
-			};
-			
-			/**
-			 *@brief	Simple functions to fetch the min/max values.
-			 **/
-			cache[id].max = ()=>cache[id].data[cache[id].maxIdx].value;
-			cache[id].min = ()=>cache[id].data[cache[id].minIdx].value;
-			
-			che = cache[id];
-		}
-		
-		/* Handle arrays */
-		if (msg.prototype.name == "Array") {
-			che.data.push(...msg.map(pt=>{
-				return {time: pt.time, value:pt.value}
-			}));
-			che.data.sort((a, b)=>(b.time-a.time));
-			recalcMinMax(che);
+	/* Handle incoming data */
+	atsb.on("Data", (...data)=>{
+		var stream = streams[data[0].id];
+		if (stream) {
+			if (data.length > 1)
+				console.log("Received blob of size: " + data.length);
+			stream.receive(...data);
 		} else {
-		/* Handle single points */
-			che.maxIdx = msg.value >= che.max() ? 0 : che.maxIdx + 1;
-			che.minIdx = msg.value <= che.min() ? 0 : che.minIdx + 1;
-			
-			che.data.unshift({time:msg.time, value:msg.value});
+			console.log("Received data from an unknown stream.");
 		}
-	}
-	 
-	atsb.on("Data", putInCache);
-	
-	/**
-	 *@brief 	Clean the caches by trimming them to a reasonable size.
-	 **/
-	function cleanCaches() {
-		for (var k in cache) {
-			if (cache[k].data.length >= 700) {
-				recalcMinMax(cache[k]);
-				cache[k].data.length = 600;
-			}
-		}
-	}
-	/* Set it on a 15s interval */
-	setInterval(cleanCaches, 15000);
+	});
 
 	/**
 	 *@brief	Get a sensor/device by its identifier.
@@ -159,254 +250,296 @@ function initATSB(opt={}, query={}) {
  *                      CANVAS FUNCTIONALITY                           *
  *                                                                     *
  ***********************************************************************/
-	
-	var canvasList = [];
-	
-	/**
-	 *@brief	Handle a drag-and-drop event on the canvas.
-	 **/
-	function canvasDrop(event) {
-		event.preventDefault();
 
-		var identifier = event.dataTransfer.getData("identifier");
-		/** 
-		 *	Add the identifier to the devices/sensors that the canvas tracks.
-		 *	If something was *added* then the canvas is forcibly redrawn,
-		 *	even if the data is static.
-		 **/
-		if (identifier && this.track(identifier)) {
-			this.update();
-		}
-	}
+	var transfer = null;
 	
-	/**
-	 *@brief	A fallback for when drag-and-drop doesn't work well on a device.
-	 **/
-	function clickToDrop(event) {
-		if (clickTransfer && this.track(clickTransfer)) {
+	class Canvas {
+		constructor(element) {
+			this.element = element;
+			if(!this.element.id) this.element.id = randomId();
+			
+			this.element.classList.add("atsb-canvas");
+			this.element.atsb = this;
+			
+			/* The click/drop handler */
+			// TODO: "this" keyword will likely act up here.
+			function drop(evt) {
+				var stream = streams[transfer];
+				
+				if (transfer !== null && stream) {
+					console.log("Transfer received: " + transfer);
+					console.log(stream);
+					this.atsb.watch(stream);
+				}
+				
+				transfer = null;
+			};
+			
+			this.element.ondrop = (evt) => {evt.preventDefault(); drop(evt);}
+			this.element.onclick = drop;
+			this.element.ondragover = (evt) => evt.preventDefault();		
+			
+			// The watchlist will be populated by the streams that the canvas
+			// is following.
+			this.watchList = [];
+			this.limits = null;
+			
+			this.padding = 20;
+			
+			this.grid = {
+				horizontal: 3,
+				vertical: 7
+			};
+			
 			this.update();
 		}
-	}
+		
+		get id() {
+			return this.element.id;
+		}
+		
+		get node() {
+			return this.element;
+		}
+		
+		get width() {
+			return this.element.width;
+		}
+		
+		set width(w) {
+			return this.element.width = w;
+		}
+		
+		get height() {
+			return this.element.height;
+		}
+		
+		set height(h) {
+			return this.element.height = h;
+		}
+		
+		/**
+		 *@brief	A getter for the limits of the canvas
+		 **/
+		get limits() {
+			return this.__limits;
+		}
+		
+		/**
+		 *@brief	A setter for the limits of the canvas
+		 *@detail	Sets the limits to defaults if object is equal to null.
+		 **/
+		set limits(obj) {
+			return (this.__limits = obj!=null ? {...obj} : {
+				startTime: null,
+				endTime: null,
+				duration: 60,
+				maxValue: null,
+				minValue: null
+			});
+		}
+		
+		/**
+		 *@brief	Add a stream to the canvas
+		 **/
+		watch(stream) {
+			if (!this.watchList.includes(stream)) {
+				this.watchList.push(stream);
+				stream.join(this.id, ()=>this.unwatch(stream));
+			}
+		}
+		
+		/**
+		 *@brief	Remove a stream from the canvas
+		 **/
+		unwatch(stream) {
+			var idx = this.watchList.indexOf(stream);
+			if (idx >= 0) {
+				this.watchList.splice(idx, 0);
+				stream.leave(this.id);
+			}
+		}
+		
+		/**
+		 *@brief	Returns the width/height ratio of the canvas.
+		 **/
+		get ratio() {
+			return this.width/this.height;
+		}
+		
+		/**
+		 *@brief	Calculate the scaling for the canvas
+		 **/
+		scaling() {
+			var min = Infinity;
+			var max = -Infinity;
+			
+			if (!(this.limits.maxValue !== null && this.limits.minValue !== null))
+				this.watchList.forEach(stream=>{
+					if(stream.minValue < min) min = stream.minValue;
+					if(stream.maxValue > max) max = stream.maxValue;
+				});
+			max = max > 1 ? max : 1;
+			min = min < -1 ? min : -1;
+			max = this.limits.maxValue !== null ? this.limits.maxValue : max;
+			min = this.limits.minValue !== null ? this.limits.minValue : min;	
+			
+			var diff = max - min;
+			
+			var end = this.limits.endTime !== null
+						? this.limits.endTime 
+						: Date.now();
+			
+			var start = this.limits.startTime !== null
+						? this.limits.startTime 
+						: end - this.limits.duration * 1000;
+			
+			var duration = end - start;
+			
+			var scale = {
+				x: this.width/duration,
+				y: (this.height-2*this.padding)/diff
+			};
+			
+			return {
+				scale: scale,
+				scope: {
+					start: start,
+					duration: duration,
+					end: end,
+					min: min,
+					diff: diff,
+					max: max
+				}
+			};
+		}
+		
+		/**
+		 *@brief	Repaints the canvas
+		 **/
+		repaint() {
+			var longer = this.ratio < 1 ? this.width : this.height;
+			var largeFont = longer/10+"px Arial";
+			var smallFont = longer/15+"px Arial";
+			
+			var ctx = this.element.getContext("2d");
+			
+			if (this.watchList.length == 0) {
+				/* Clear canvas */
+				ctx.clearRect(0, 0, this.width, this.height);
+				
+				ctx.textAlign = "center";
+				ctx.strokeStyle = "#000000";
+				
+				ctx.font = largeFont;
+				ctx.fillText("This canvas is empty", 
+						this.width/2, this.height/2 - longer/20);
+				ctx.font = smallFont;
+				ctx.fillText("Drag and drop something here!",
+							this.width/2, this.height/2 + longer/30);
+			} else {
+				var scaling = this.scaling();
+				
+				/* Clear canvas */
+				ctx.clearRect(0, 0, this.width, this.height);
+				
+				/* Paint the grid */
+				ctx.textAlign = "left";
+				ctx.font = smallFont;
+				ctx.strokeStyle = "#454545";
+				ctx.lineWidth = 1;
+				
+				/* Paint the horizontal lines */
+				for(var y = 1; y <= this.grid.horizontal; y++)
+				{
+					var ry = y/(this.grid.horizontal + 1);
+					
+					/* Paint horizontal line */
+					ctx.beginPath();
+					ctx.moveTo(0, ry*this.height);
+					ctx.lineTo(this.width, ry*this.height);
+					ctx.stroke();
+					
+					/* Draw the label */
+					var val = scaling.scope.max-ry*scaling.scope.diff;
+					val = Math.abs(val)>10 ? Math.round(val) : val.toPrecision(2);
+					ctx.fillText(val, 5, ry*this.height-5);
+				}
+				
+				/* Paint the vertical lines */
+				for(var x = 1; x <= this.grid.vertical; x++)
+				{
+					var rx = x/(this.grid.vertical + 1);
+					
+					/* Paint the line */
+					ctx.beginPath();
+					ctx.moveTo(rx*this.width, 0);
+					ctx.lineTo(rx*this.width, this.height);
+					ctx.stroke();
+					
+					var time = "T-"+Math.round(scaling.scope.duration*(1-rx)/1000)+"s";
+					ctx.fillText(time, rx*this.width+5, this.height-5);
+				}
+				
+				/* Paint the graphs */
+				ctx.lineWidth = 2;
+				this.watchList.forEach(stream=>{					
+					// Helper function to calculate the point on canvas based
+					// on data point value and time.
+					var padding = this.padding;
+					function getPoint(pt) {
+						return [
+							(pt.time - scaling.scope.start) * scaling.scale.x,
+							(scaling.scope.max - pt.value) * scaling.scale.y 
+							+ padding
+						];
+					}
+					
+					//
+					ctx.strokeStyle = stream.style;
+					ctx.beginPath();
+					
+					for (var idx in stream.cache) {
+						var pt = getPoint(stream.cache[idx]);
+						if (idx == 0) {
+							ctx.moveTo(...pt);
+						} else {
+							ctx.lineTo(...pt);
+						}
+					}
+					
+					ctx.stroke();
+				});
+			}
+		}
+		
+		/**
+		 *@brief	Update the canvas
+		 **/
+		update() {
+			if (this.width != this.element.offsetWidth)
+				this.width = this.element.offsetWidth;
+			if (this.height != this.element.offsetHeight)
+				this.height = this.element.offsetHeight;
+			
+			this.repaint();
+			setTimeout(()=>this.update(), 1000/opt.refreshRate);
+		}
+	};
 
 	/**
 	 *@brief	Creates and returns a new ATSB-initialized canvas.
 	 **/
-	function newCanvas() {
+	atsb.createCanvas = ()=>{
 		var c = document.createElement("canvas");
-		c.id = randomId();
-		
-		initCanvas(c);
-		
-		return c;
+		return new Canvas(c);
 	}
 	
 	/**
 	 *@brief	Initializes the given canvas for use with ATSB.
 	 **/
-	function initCanvas(canvas) {
-		canvasList.push(canvas);
-		canvas.classList.add("atsb-canvas");
-		
-		canvas.limits	= {
-			time:		60000
-		};
-		
-		canvas.lineSpacing = {
-			vertical:	1/4,
-			horizontal: 1/8
-		};
-		
-		canvas.tracked = [];
-		
-		/**
-		 *@brief	Adds an identifier to be tracked.
-		 *@detail	If sensor identifiers are present when a device identifier is
-		 *			added, they are all merged together.
-		 *@detail	Guaranteed no duplicates
-		 *
-		 *@return	Whether it was added.
-		 **/
-		canvas.track = (identifier) => {	
-			// FIXME: Issues would arise if entire devices were to be tracked.
-			if (canvas.tracked.includes(identifier) || 
-					canvas.tracked.filter(id=>identifier.endsWith(id)).length)
-				return false;
-			
-			atsb.subscribe(...identifier);
-			
-			/* Add only the identifiers that are new */
-			canvas.tracked = canvas.tracked.filter(id=>!id.endsWith(identifier));
-			canvas.tracked.push(identifier);
-			
-			/* If canvas was static, make it not static */
-			if (canvas.isStatic) canvas.isStatic = false;
-			
-			console.log("Canvas " + canvas.id + " is now tracking " + identifier);
-			
-			return true;
-		};
-		
-		/**
-		 *@brief	Resets the canvas to a clean state.
-		 **/
-		canvas.reset = () => {
-			atsb.unsubscribe(...canvas.tracked);
-			canvas.tracked.length = 0;
-		
-			const w = canvas.width;
-			const h = canvas.height;
-		
-			var big = (h<w?h:w)/10; // Big font
-			var sml = (h<w?h:w)/15; // Small font
-			
-			/* Create and clear context */
-			var ctx = canvas.getContext("2d");
-			ctx.clearRect(0, 0, w, h);
-			
-			ctx.textAlign = "center";
-			
-			/* Draw text */
-			ctx.font = big+"px Arial";
-			ctx.fillText("This canvas is empty", w/2, h/2-big/2);
-			
-			ctx.font = sml+"px Arial";
-			ctx.fillText("Drag and drop something here!", w/2, h/2+sml/2);
-		}
-		
-		/**
-		 *@brief	Paints the canvas, clearing any previous data.
-		 **/
-		canvas.update = () => {
-			/* A lock to prevent multiple simultaneous repaints */
-			/* Probably not needed, but better to be safe */
-			if (canvas.updateLock)
-				return;
-			canvas.updateLock = true;
-			
-			/* If canvas is empty and not static, reset. */
-			if (!canvas.isStatic && canvas.tracked.length == 0) {
-				canvas.reset();
-			} else {
-				/* Otherwise, paint on it. */				
-				/* Get tracked caches */
-				var caches = Object.entries(cache).filter(e=>
-										canvas.tracked.includes(e[0])
-								).map(e=>e[1]);
-								
-				/* Find min/max */
-				var max = -Infinity;
-				var min = Infinity;
-				for (var k in caches) {
-					if (caches[k].max() > max)
-						max = caches[k].max();
-					if (caches[k].min() < min)
-						min = caches[k].min();
-				}
-				
-				/* Place minimum/maximum near zero, if it already isn't */
-				/* It's otherwise somewhat difficult to read the graphs */
-				max = max > 1 ? max : 1;
-				min = min < -1 ? min : -1;
-				
-				/* Calculate various parameters for drawing */
-				/* Actual min/max are overridden by user-set ones. */
-				var scope = {
-					maxValue: max,
-					minValue: min,
-					...canvas.limits
-				};
-				
-				scope.end = scope.end?scope.end:Date.now();
-				scope.start = scope.start?scope.start:scope.end-scope.time;
-				scope.time = scope.end-scope.start;
-				scope.range = scope.maxValue-scope.minValue;
-				
-				/* Calculate the scaling */
-				var scale = {
-					x: canvas.width/scope.time,
-					y: canvas.height*0.8/scope.range
-				};
-				
-				var cidx = 0;
-				
-				/* Get context and clear the canvas */
-				var ctx = canvas.getContext("2d");
-				ctx.clearRect(0, 0, canvas.width, canvas.height);
-				
-				/* Paint grid */
-				ctx.textAlign = "left";
-				ctx.font = canvas.height/15+"px Arial";
-				ctx.strokeStyle = "#454545";
-				ctx.lineWidth = 1;
-				var x, y;
-				
-				/* Vertical lines */
-				for(var i = 1; (y = i*canvas.lineSpacing.horizontal) < 1; i++)
-				{
-					ctx.beginPath();
-					ctx.moveTo(0, y*canvas.height);
-					ctx.lineTo(canvas.width, y*canvas.height);
-					ctx.stroke();
-					ctx.fillText((scope.maxValue-y*scope.range).toPrecision(2), 
-								5, y*canvas.height-5);
-				}
-				
-				/* Horizontal lines */
-				for(var i = 1; (x = i*canvas.lineSpacing.vertical) < 1; i++)
-				{
-					ctx.beginPath();
-					ctx.moveTo(x*canvas.width, 0);
-					ctx.lineTo(x*canvas.width, canvas.height);
-					ctx.stroke();
-					ctx.fillText("T-"+Math.round(scope.time*(1-x)/1000)+"s", 
-						x*canvas.width+5, canvas.height-5);
-				}
-				
-				/* Paint the data */
-				ctx.lineWidth = 2;
-				for(var che of caches) {
-					var set = che.data; // Data set
-					var idx = 0; // Index
-					
-					// Helper function to calculate the point on canvas based
-					// on data point value and time.
-					function getPoint(pt) {
-						return [
-							(pt.time - scope.start) * scale.x,
-							(scope.maxValue - pt.value) * scale.y 
-							+ canvas.height * 0.1
-						];
-					}
-					
-					// Set style and move to the edge of the canvas.
-					ctx.strokeStyle = che.sensor.style;
-					ctx.beginPath();
-					ctx.moveTo(...getPoint(set[idx]));
-					idx++;
-					
-					// Lines.
-					for(; idx < set.length; idx++) {
-						ctx.lineTo(...getPoint(set[idx]));
-					}
-					
-					// Paint the line.
-					ctx.stroke();
-				}
-			}
-			/* Unlock */
-			canvas.updateLock = false;
-		}
-		
-		// Set the canvas to empty state
-		canvas.reset();
-		
-		/* UI event handlers */
-		canvas.ondragover = (ev)=>ev.preventDefault();
-		canvas.ondrop = canvasDrop;
-		canvas.onclick = clickToDrop;
-		
-		/* Start automatic updates */
-		setInterval(canvas.update, opt.paintInterval);
+	atsb.initCanvas = (canvas)=>{
+		return new Canvas(canvas);
 	}
 	
 /***********************************************************************
@@ -420,28 +553,19 @@ function initATSB(opt={}, query={}) {
 	/**
 	 *@brief	Drag (and drop) functionality for sensor and device elements
 	 **/
-	function dragElement(event) {
-		console.log("Dragged " + this.identifier);
-		event.dataTransfer.setData("identifier", this.identifier);
+	function drag(event) {
+		transfer = this.identifier;
 	}
 	
 	/**
 	 *@brief	Click-to-hide functionality for device/list elements.
 	 **/
+	// FIXME: Unused
 	function clickToHide(event) {
 		this.open = !this.open;
 		this.findAllATSB().forEach(e=>{
 			e.style.display = this.open?null:"none";
 		});
-	}
-	
-	/**
-	 *@brief	A helper function to transfer elements to canvas by clicking/tapping.
-	 **/
-	var clickTransfer = null;
-	function clickToDrag(event) {
-		clickTransfer = this.identifier;
-		console.log("Transfering: " + clickTransfer);
 	}
 	
 	/**
@@ -453,9 +577,7 @@ function initATSB(opt={}, query={}) {
 		el.classList.add("atsb-sensor");
 		el.setAttribute("draggable", true);
 		el.identifier = sensor;
-		el.sensor = devices[mac].sensors[
-						devices[mac].sensors.map(s=>s.id+"@"+mac).indexOf(sensor)
-					];
+		el.sensor = devices[mac].sensors[sensor];
 		
 		var ind = document.createElement("span");
 		ind.id = "indicator@" + el.id;
@@ -475,8 +597,12 @@ function initATSB(opt={}, query={}) {
 		
 		console.log("New sensor: "+el.identifier);
 		
-		el.ondragstart = dragElement;
-		el.onclick = clickToDrag;
+		el.ondragstart = drag;
+		el.onclick = (evt) => {
+			evt.preventDefault();
+			console.log("Clicked "+el.identifier);
+			transfer = el.identifier;
+		};
 		
 		return el;
 	}
@@ -528,8 +654,9 @@ function initATSB(opt={}, query={}) {
 					// FIXME: Device name doesn't update
 					/* Update the name of the device in case it changed */
 					hdr.innerHTML = `${el.device.name} (${mac})`;
-					/* Grab a list of sensor identifiers from the global list */
-					var ids = el.device.sensors.map(s=>s.id+"@"+mac);
+					/* Grab a list of sensor identifiers */
+					var ids = [];
+					for (var id in el.device.sensors) ids.push(id);
 					var toRemove = [];
 					/** 
 					 *	Figure out which sensor elements to remove, and for which
@@ -580,19 +707,17 @@ function initATSB(opt={}, query={}) {
 		list.appendChild(hdr);
 		list.header = hdr;
 		
-		var inner = document.createElement("div");
-		inner.classList.add("atsb-list-inner");
-		list.appendChild(inner);
+		var innerList = document.createElement("div");
+		innerList.classList.add("atsb-list-inner");
+		list.appendChild(innerList);
 		
 		/**
 		 *@brief	Find all ATSB child elements 
 		 **/
 		list.findAllATSB = () => {
 			var atsbNodes = [];
-			for (var k in inner.childNodes) {
-				if (inner.childNodes[k].identifier)
-					atsbNodes.push(inner.childNodes[k]);
-					
+			for (var node of innerList.childNodes) {
+				if (node.identifier) atsbNodes.push(node);
 			}
 			return atsbNodes;
 		}
@@ -623,9 +748,9 @@ function initATSB(opt={}, query={}) {
 					/* Update devices */
 					listDevs.forEach(de=>de.update());
 					/* Remove devices that were removed */
-					toRemove.forEach(inner.removeChild);
+					toRemove.forEach(innerList.removeChild);
 					/* Add devices that were added */
-					ids.forEach(id=>inner.appendChild(newDeviceElement(id)));
+					ids.forEach(id=>innerList.appendChild(newDeviceElement(id)));
 					
 					/* Sort the devices */
 					// FIXME: Not sure this works, at all.
@@ -638,7 +763,7 @@ function initATSB(opt={}, query={}) {
 					}
 					
 					elarr.sort((a,b)=> a.innerHTML==b.innerHTML? 0 : a.innerHTML>b.innerHTML? 1 : -1);
-					elarr.forEach(inner.appendChild);
+					elarr.forEach(el=>innerList.appendChild(el));
 					
 					/* Log */
 					console.log(`Device List updated. `
@@ -665,7 +790,8 @@ function initATSB(opt={}, query={}) {
 	 *@brief	Update all device lists.
 	 **/
 	function updateDeviceLists() {
-		devLists.forEach(l=>l.update());
+		if(devLists)
+			devLists.forEach(l=>l.update());
 		console.log("List updates queued.");
 	};
 	
@@ -674,36 +800,18 @@ function initATSB(opt={}, query={}) {
  *                       EXPORTED ATSB FUNCTIONS                       *
  *                                                                     *
  ***********************************************************************/
-
-	/**
-	 *@brief	Subscribe to streams 
-	 **/
-	atsb.subscribe 	= (...rooms) => {
-		rooms = rooms.filter(r=>!subscriptions.includes(r));
-		if (rooms.length) {
-			subscriptions.push(...rooms);
-			atsb.emit("Subscribe", rooms);
-		}
-	}
-	
-	/**
-	 *@brief	Unsubscribe from streams 
-	 **/ 
-	atsb.unsubscribe = (...rooms) => {
-		rooms = rooms.filter(r=>subscriptions.includes(r));
-		if (rooms.length) {
-			rooms.forEach(r=>subscriptions.splice(subscriptions.indexOf(r)));
-			atsb.emit("Unsubscribe", rooms);
-		}
-	}
 	
 	/* Request device synchronization */
 	atsb.refreshDevices = () => atsb.emit("ListDevices");
 	
 	/* Export functions */
-	atsb.initCanvas 			= initCanvas;
-	atsb.newCanvas 				= newCanvas;
 	atsb.newDeviceList 			= newDeviceList;
+	
+/***********************************************************************
+ *                                                                     *
+ *                    COMPLETE THE INITIALIZATION                      *
+ *                                                                     *
+ ***********************************************************************/
 	
 	return atsb;
 	

@@ -18,7 +18,6 @@ const https = require("https");
 const fs = require("fs");
 const io = require("socket.io")();
 const atsb = require("./atsb.js")();
-const test = require("./test.js")(atsb);
 
 var https_options = {
 	enabled: false,
@@ -127,7 +126,13 @@ stdin.addListener("data", (data)=>{
 			}
 			else
 			{
-				console.log("Not yet implemented");
+				switch(cmd[1]) {
+					default: console.log("Not yet implemented"); break;
+					case "device": 
+							new atsb.Device(cmd[2], cmd[3], cmd.slice(4, cmd.length-1).join(" ")); 
+							console.log("Device created.");
+							break;
+				}
 			}
 			break;
 		default:

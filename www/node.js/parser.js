@@ -7,7 +7,7 @@
  * parser.js
  * 
  * Created on: 2018-08-17
- * Last Modified: 2018-08-29
+ * Last Modified: 2018-09-02
  * Author(s): Veli-Matti Rantanen
  **/
  
@@ -19,7 +19,7 @@ const crypto = require("crypto");
 var defaultSensor = {
 	size: 16, signed: false,
 	name: "Unnamed Sensor",
-	precision: 1, color: "black"
+	precision: 1, style: "black"
 };
 
 var sensorTypes = {
@@ -41,6 +41,8 @@ module.exports = function(atsb, loadedSensorTypes={}) {
 		/* Check the parameter types */
 		if ((typeof type != "string" || arr.constructor.name != "Array")) 
 			return;
+		
+		type = type.toLowerCase();
 		
 		/* If sensor doesn't exist, it can be registered */
 		if (!sensorTypes[type])
@@ -95,9 +97,7 @@ module.exports = function(atsb, loadedSensorTypes={}) {
 	 *@returns	The HMAC in hex encoding.
 	 **/
 	function hmac(data, key) {
-		const hmac = crypto.createHmac("sha-256", key);
-		hmac.update(data, "hex");
-		return hmac.digest("hex");
+		return crypto.createHmac("sha256", key).update(data).digest("hex");
 	}
 	
 	/* For each key-value pair in loadedSensorTypes... */
@@ -127,7 +127,7 @@ module.exports = function(atsb, loadedSensorTypes={}) {
 	 **/
 	parser.parse = (msg, msgId) => {
 		function parseField(field) {
-			var type = field.slice(8,12);
+			var type = field.slice(8,12).toLowerCase();
 			var info = sensorTypes[type];
 			if (!info) info = sensorTypes["default"];
 			
@@ -156,7 +156,7 @@ module.exports = function(atsb, loadedSensorTypes={}) {
 		
 		/* Check that the device exists */
 		var dev = atsb.getDevice(msg.mac);
-		if (!dev) {
+		if (dev === undefined) {
 			atsb.emit("Warning", "UnknownDeviceWarning", 
 					`Data was received from unknown device '${msg.mac}'. (${msgId})`,
 					msgId, msg.mac, msg);
@@ -179,7 +179,7 @@ module.exports = function(atsb, loadedSensorTypes={}) {
 			return;
 		} else {
 			/* Authentication succeeded, decrypt message. */
-			var pld		= parser.decrypt(cpld, key);
+			var pld		= decrypt(cpld, key);
 			
 			/* Check counter */
 			var skip = dev.isNextCounter(parseInt(pld.slice(0, 8), 16))
