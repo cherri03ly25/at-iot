@@ -7,24 +7,25 @@
  * atsb.js
  * 
  * Created on: 2018-07-20
- * Last Modified: 2018-08-23
+ * Last Modified: 2018-09-02
  * Author(s): Veli-Matti Rantanen
  **/
 
 const ATSBDefaultOptions = {
 		namespace: "/atsb",
 		paintInterval: 50,
-		timeScope: 60,
-		query: {}
-	};
+		timeScope: 60
+}
 
-function initATSB(opt={}) {	
-	var devices = {};
+function initATSB(opt={}, query={}) {
 	var opt = {...ATSBDefaultOptions, ...opt};
-	var cache = {};
 	
+	var devices = {};
+	var cache = {};
 	var subscriptions = [];
-	var atsb = io(`${opt.namespace}`, {query: {...opt.query}});
+	
+	/* Connect to namespace */
+	var atsb = io(`${opt.namespace}`, {query: query});
 	
 	/* Export variables */
 	atsb.devices = devices;
@@ -32,6 +33,7 @@ function initATSB(opt={}) {
 	
 	/* Handle the server sending a device list */
 	atsb.on("DeviceList", list=>{
+			// FIXME: There is a bug that causes references to the list to break.
 			console.log("Device list updated.");
 			console.log(list);
 			list.forEach(dev=>devices[dev.mac] = {...dev});
@@ -41,13 +43,13 @@ function initATSB(opt={}) {
 	/* Handle the server announcing a new device */
 	atsb.on("DeviceAdded", devInfo=>{
 			devices[devInfo.mac] = {...devInfo};
-			console.log("New device added");
+			console.log("New device added: "+devInfo.mac);
 			updateDeviceLists();
 		});
 	
 	/* Handle the server announcing a changed device */
 	atsb.on("DeviceUpdated", devInfo=>{
-		console.log("Device updated");
+		console.log("Device updated: "+devInfo.mac);
 		var dev = devices[devInfo.mac];
 		dev.name = devInfo.name;
 		var ids = dev.sensors.map(s=>s.id);
@@ -57,15 +59,7 @@ function initATSB(opt={}) {
 	});
 	
 	/**
-	 *@brief 	Handle server sending data
-	 *
-	 *@detail	Data that has same counter as prior data is discarded
-	 *@detail	The counter is incremented server-side when sending new data
-	 *@detail 	This prevents the client from getting confused when multiples 
-	 *			of the same packet arrive from different streams. 
-	 *
-	 *@warning	If subscriptions are not properly kept track of, the client may
-	 *			receive multiples of the same data.
+	 *@brief 	Recalculate the min/max values for the given cache.
 	 **/
 	function recalcMinMax(che) {
 		var max = 0;
@@ -81,42 +75,53 @@ function initATSB(opt={}) {
 		che.minIdx = min;
 	}
 	 
+	/**
+	 *@brief	Cache received messages.
+	 *@detail	Assumes that single readings are the newest
+	 *@detail	If an array is received, the cache will get sorted.
+	 *
+	 *@param	msg		Either a single reading, or an Array.
+	 **/
 	function putInCache(msg) {
-		if (!cache[msg.id]) {
-			console.log("Initialized cache for "+msg.id);
-			cache[msg.id] = {
-				sensor: atsb.getByIdentifier(msg.id),
+		var id = msg.id ? msg.id : msg[0].id;
+		var che = cache[id];
+		
+		/* Create the cache if needed */
+		if (!che) {
+			console.log("Initialized cache for "+id);
+			cache[id] = {
+				sensor: atsb.getByIdentifier(id),
 				maxIdx: 0,
 				minIdx: 0,
-				data: [{time:msg.time, value:msg.value}]
+				data: []
 			};
-			cache[msg.id].max = ()=>{
-					if(!cache[msg.id].data[cache[msg.id].maxIdx]) {
-						recalcMinMax(cache[msg.id]);
-					}
-					return cache[msg.id].data[cache[msg.id].maxIdx].value;
-				}
-			cache[msg.id].min = ()=>{
-					if(!cache[msg.id].data[cache[msg.id].minIdx]) {
-						recalcMinMax(cache[msg.id]);
-					}
-					return cache[msg.id].data[cache[msg.id].minIdx].value;
-				}
-		}else{
-			var che = cache[msg.id];
-
+			
+			/**
+			 *@brief	Simple functions to fetch the min/max values.
+			 **/
+			cache[id].max = ()=>cache[id].data[cache[id].maxIdx].value;
+			cache[id].min = ()=>cache[id].data[cache[id].minIdx].value;
+			
+			che = cache[id];
+		}
+		
+		/* Handle arrays */
+		if (msg.prototype.name == "Array") {
+			che.data.push(...msg.map(pt=>{
+				return {time: pt.time, value:pt.value}
+			}));
+			che.data.sort((a, b)=>(b.time-a.time));
+			recalcMinMax(che);
+		} else {
+		/* Handle single points */
 			che.maxIdx = msg.value >= che.max() ? 0 : che.maxIdx + 1;
 			che.minIdx = msg.value <= che.min() ? 0 : che.minIdx + 1;
 			
 			che.data.unshift({time:msg.time, value:msg.value});
-			/* Should work without this... */
-			//cache[data.id].data.sort((a,b)=>(b.time-a.time));
 		}
 	}
 	 
 	atsb.on("Data", putInCache);
-	atsb.on("CachedData", (id, data)=>
-			data.reverse().forEach(msg=>putInCache({...msg, id:id})));
 	
 	/**
 	 *@brief 	Clean the caches by trimming them to a reasonable size.
@@ -174,6 +179,9 @@ function initATSB(opt={}) {
 		}
 	}
 	
+	/**
+	 *@brief	A fallback for when drag-and-drop doesn't work well on a device.
+	 **/
 	function clickToDrop(event) {
 		if (clickTransfer && this.track(clickTransfer)) {
 			this.update();
@@ -203,6 +211,11 @@ function initATSB(opt={}) {
 			time:		60000
 		};
 		
+		canvas.lineSpacing = {
+			vertical:	1/4,
+			horizontal: 1/8
+		};
+		
 		canvas.tracked = [];
 		
 		/**
@@ -214,16 +227,19 @@ function initATSB(opt={}) {
 		 *@return	Whether it was added.
 		 **/
 		canvas.track = (identifier) => {	
+			// FIXME: Issues would arise if entire devices were to be tracked.
 			if (canvas.tracked.includes(identifier) || 
 					canvas.tracked.filter(id=>identifier.endsWith(id)).length)
 				return false;
 			
-			atsb.subscribe(identifier);
+			atsb.subscribe(...identifier);
+			
+			/* Add only the identifiers that are new */
 			canvas.tracked = canvas.tracked.filter(id=>!id.endsWith(identifier));
 			canvas.tracked.push(identifier);
 			
-			if (canvas.isStatic)
-				canvas.isStatic = false;
+			/* If canvas was static, make it not static */
+			if (canvas.isStatic) canvas.isStatic = false;
 			
 			console.log("Canvas " + canvas.id + " is now tracking " + identifier);
 			
@@ -234,48 +250,50 @@ function initATSB(opt={}) {
 		 *@brief	Resets the canvas to a clean state.
 		 **/
 		canvas.reset = () => {
-			atsb.unsubscribe(canvas.tracked);
-			
+			atsb.unsubscribe(...canvas.tracked);
 			canvas.tracked.length = 0;
 		
-			var big = canvas.height/10;
-			var sml = canvas.height/15;
+			const w = canvas.width;
+			const h = canvas.height;
+		
+			var big = (h<w?h:w)/10; // Big font
+			var sml = (h<w?h:w)/15; // Small font
 			
+			/* Create and clear context */
 			var ctx = canvas.getContext("2d");
-			ctx.clearRect(0, 0, canvas.width, canvas.height);
+			ctx.clearRect(0, 0, w, h);
 			
 			ctx.textAlign = "center";
 			
+			/* Draw text */
 			ctx.font = big+"px Arial";
-			ctx.fillText("This canvas is empty", canvas.width/2, 
-							canvas.height/2-big/2);
+			ctx.fillText("This canvas is empty", w/2, h/2-big/2);
 			
 			ctx.font = sml+"px Arial";
-			ctx.fillText("Drag and drop something here!", 
-								canvas.width/2, canvas.height/2+sml/2);
+			ctx.fillText("Drag and drop something here!", w/2, h/2+sml/2);
 		}
 		
 		/**
 		 *@brief	Paints the canvas, clearing any previous data.
 		 **/
 		canvas.update = () => {
+			/* A lock to prevent multiple simultaneous repaints */
+			/* Probably not needed, but better to be safe */
 			if (canvas.updateLock)
 				return;
-				
 			canvas.updateLock = true;
-			/* If data is not static but there's nothing on graph, reset. */
-			if (canvas.tracked.length == 0) {
+			
+			/* If canvas is empty and not static, reset. */
+			if (!canvas.isStatic && canvas.tracked.length == 0) {
 				canvas.reset();
-			/* Otherwise, paint on it. */
 			} else {
-				/* Get context and clear the canvas */
-				var ctx = canvas.getContext("2d");
-				
+				/* Otherwise, paint on it. */				
 				/* Get tracked caches */
 				var caches = Object.entries(cache).filter(e=>
 										canvas.tracked.includes(e[0])
 								).map(e=>e[1]);
-				/* Get min/max */
+								
+				/* Find min/max */
 				var max = -Infinity;
 				var min = Infinity;
 				for (var k in caches) {
@@ -285,6 +303,8 @@ function initATSB(opt={}) {
 						min = caches[k].min();
 				}
 				
+				/* Place minimum/maximum near zero, if it already isn't */
+				/* It's otherwise somewhat difficult to read the graphs */
 				max = max > 1 ? max : 1;
 				min = min < -1 ? min : -1;
 				
@@ -296,12 +316,12 @@ function initATSB(opt={}) {
 					...canvas.limits
 				};
 				
-				//scope.time *= 1000;
 				scope.end = scope.end?scope.end:Date.now();
 				scope.start = scope.start?scope.start:scope.end-scope.time;
 				scope.time = scope.end-scope.start;
 				scope.range = scope.maxValue-scope.minValue;
 				
+				/* Calculate the scaling */
 				var scale = {
 					x: canvas.width/scope.time,
 					y: canvas.height*0.8/scope.range
@@ -309,8 +329,8 @@ function initATSB(opt={}) {
 				
 				var cidx = 0;
 				
-				//console.log(caches);
-				
+				/* Get context and clear the canvas */
+				var ctx = canvas.getContext("2d");
 				ctx.clearRect(0, 0, canvas.width, canvas.height);
 				
 				/* Paint grid */
@@ -319,6 +339,8 @@ function initATSB(opt={}) {
 				ctx.strokeStyle = "#454545";
 				ctx.lineWidth = 1;
 				var x, y;
+				
+				/* Vertical lines */
 				for(var i = 1; (y = i*canvas.lineSpacing.horizontal) < 1; i++)
 				{
 					ctx.beginPath();
@@ -329,6 +351,7 @@ function initATSB(opt={}) {
 								5, y*canvas.height-5);
 				}
 				
+				/* Horizontal lines */
 				for(var i = 1; (x = i*canvas.lineSpacing.vertical) < 1; i++)
 				{
 					ctx.beginPath();
@@ -339,11 +362,14 @@ function initATSB(opt={}) {
 						x*canvas.width+5, canvas.height-5);
 				}
 				
+				/* Paint the data */
 				ctx.lineWidth = 2;
 				for(var che of caches) {
-					var set = che.data;
-					var idx = 0;
+					var set = che.data; // Data set
+					var idx = 0; // Index
 					
+					// Helper function to calculate the point on canvas based
+					// on data point value and time.
 					function getPoint(pt) {
 						return [
 							(pt.time - scope.start) * scale.x,
@@ -352,23 +378,29 @@ function initATSB(opt={}) {
 						];
 					}
 					
+					// Set style and move to the edge of the canvas.
 					ctx.strokeStyle = che.sensor.style;
 					ctx.beginPath();
 					ctx.moveTo(...getPoint(set[idx]));
 					idx++;
 					
+					// Lines.
 					for(; idx < set.length; idx++) {
 						ctx.lineTo(...getPoint(set[idx]));
 					}
 					
+					// Paint the line.
 					ctx.stroke();
 				}
 			}
+			/* Unlock */
 			canvas.updateLock = false;
 		}
 		
+		// Set the canvas to empty state
 		canvas.reset();
 		
+		/* UI event handlers */
 		canvas.ondragover = (ev)=>ev.preventDefault();
 		canvas.ondrop = canvasDrop;
 		canvas.onclick = clickToDrop;
@@ -389,7 +421,6 @@ function initATSB(opt={}) {
 	 *@brief	Drag (and drop) functionality for sensor and device elements
 	 **/
 	function dragElement(event) {
-//		event.preventDefault();
 		console.log("Dragged " + this.identifier);
 		event.dataTransfer.setData("identifier", this.identifier);
 	}
@@ -404,6 +435,9 @@ function initATSB(opt={}) {
 		});
 	}
 	
+	/**
+	 *@brief	A helper function to transfer elements to canvas by clicking/tapping.
+	 **/
 	var clickTransfer = null;
 	function clickToDrag(event) {
 		clickTransfer = this.identifier;
@@ -436,7 +470,7 @@ function initATSB(opt={}) {
 		el.appendChild(lbl);
 		
 		el.update = () => {
-			
+			// TODO: Something?
 		}
 		
 		console.log("New sensor: "+el.identifier);
@@ -454,6 +488,7 @@ function initATSB(opt={}) {
 		var el = document.createElement("div");
 		el.id = randomId();
 		el.classList.add("atsb-device");
+		//FIXME: Device drag-and-drop.
 		//el.setAttribute("draggable", false);
 		el.open = true;
 		el.device = devices[mac];
@@ -485,10 +520,12 @@ function initATSB(opt={}) {
 		 *@detail	This function does not block.
 		 **/
 		el.update = () => {
+			/* Just to be safe, use a lock */
 			if (!el.updateLock) {
 				el.updateLock = true;
 				setTimeout(()=>{
 					var sensors = el.findAllATSB();
+					// FIXME: Device name doesn't update
 					/* Update the name of the device in case it changed */
 					hdr.innerHTML = `${el.device.name} (${mac})`;
 					/* Grab a list of sensor identifiers from the global list */
@@ -521,6 +558,7 @@ function initATSB(opt={}) {
 			}
 		};
 
+//		FIXME: Device drag-and-drop
 //		el.onclick = clickToHide;
 //		el.ondragstart = dragElement;
 		
@@ -542,11 +580,6 @@ function initATSB(opt={}) {
 		list.appendChild(hdr);
 		list.header = hdr;
 		
-		/*var lbl = document.createElement("h3");
-		lbl.innerHTML = "Connected Devices";
-		lbl.classList.add("atsb-list-label");
-		hdr.appendChild(lbl);*/
-		
 		var inner = document.createElement("div");
 		inner.classList.add("atsb-list-inner");
 		list.appendChild(inner);
@@ -564,14 +597,20 @@ function initATSB(opt={}) {
 			return atsbNodes;
 		}
 		
+		/**
+		 *@brief	Update the list and all its children.
+		 **/
 		list.update = () => {
+			/* Use a lock, just in case */
 			if(!list.updateLock) {
 				list.updateLock = true;
+				/* Do not block */
 				setTimeout(()=> {
 					var ids = Object.keys(devices);
 					var toRemove = [];
 					var listDevs = list.findAllATSB();
 
+					/* Find the devices to remove and remove existing devices from list */
 					listDevs.forEach(de=>{
 						var idx = ids.indexOf(de.identifier);
 						if(idx >= 0) {
@@ -581,25 +620,32 @@ function initATSB(opt={}) {
 						}
 					});
 					
-					toRemove.forEach(inner.removeChild);
+					/* Update devices */
 					listDevs.forEach(de=>de.update());
+					/* Remove devices that were removed */
+					toRemove.forEach(inner.removeChild);
+					/* Add devices that were added */
 					ids.forEach(id=>inner.appendChild(newDeviceElement(id)));
 					
-					var els = inner.childNodes;
+					/* Sort the devices */
+					// FIXME: Not sure this works, at all.
+					var nodes = list.findAllATSB();
 					var elarr = [];
-					for (var i in els){
-						if(els[i].nodeType == 1) {
-							elarr.push(els[i]);
+					for (var node of nodes){
+						if(node.nodeType == 1) {
+							elarr.push(node);
 						}
 					}
 					
 					elarr.sort((a,b)=> a.innerHTML==b.innerHTML? 0 : a.innerHTML>b.innerHTML? 1 : -1);
 					elarr.forEach(inner.appendChild);
 					
+					/* Log */
 					console.log(`Device List updated. `
 								+ `${toRemove.length} removed, `
 								+ `${listDevs.length} updated and `
 								+ `${ids.length} added.`);
+					/* Unlock */
 					list.updateLock = false;
 				}, 100);
 			}
@@ -607,6 +653,7 @@ function initATSB(opt={}) {
 		
 		list.update();
 		
+		/* Set updating on an interval */
 		setInterval(list.update, 15000);
 		
 		devLists.push(list);
@@ -614,6 +661,9 @@ function initATSB(opt={}) {
 		return list;
 	};
 	
+	/**
+	 *@brief	Update all device lists.
+	 **/
 	function updateDeviceLists() {
 		devLists.forEach(l=>l.update());
 		console.log("List updates queued.");
@@ -625,7 +675,9 @@ function initATSB(opt={}) {
  *                                                                     *
  ***********************************************************************/
 
-	/* Functions to subscribe to different streams */
+	/**
+	 *@brief	Subscribe to streams 
+	 **/
 	atsb.subscribe 	= (...rooms) => {
 		rooms = rooms.filter(r=>!subscriptions.includes(r));
 		if (rooms.length) {
@@ -633,6 +685,10 @@ function initATSB(opt={}) {
 			atsb.emit("Subscribe", rooms);
 		}
 	}
+	
+	/**
+	 *@brief	Unsubscribe from streams 
+	 **/ 
 	atsb.unsubscribe = (...rooms) => {
 		rooms = rooms.filter(r=>subscriptions.includes(r));
 		if (rooms.length) {
@@ -640,8 +696,11 @@ function initATSB(opt={}) {
 			atsb.emit("Unsubscribe", rooms);
 		}
 	}
+	
 	/* Request device synchronization */
 	atsb.refreshDevices = () => atsb.emit("ListDevices");
+	
+	/* Export functions */
 	atsb.initCanvas 			= initCanvas;
 	atsb.newCanvas 				= newCanvas;
 	atsb.newDeviceList 			= newDeviceList;
@@ -654,7 +713,11 @@ function initATSB(opt={}) {
  *                                                                     *
  ***********************************************************************/
 	
-	/* Element creation functions */
+	/**
+	 *@brief	Generate a random id for an element.
+	 *@detail	The identifiers start with 'atsb#' and end with 8 hexadecimal
+	 *			characters.
+	 **/
 	function randomId() {
 		var id = "atsb#"+Math.random().toString(16).slice(-8);
 		/* Ensure uniqueness. */

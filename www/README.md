@@ -30,4 +30,4 @@ Dependency | Required | Recommended | Version | Install Command
 `npm` 		|   | x | 3.5.2 	| `sudo apt install npm`
 `pm2` 		|   | x | 2.10.4 	| `sudo npm install -g pm2`
 `socket.io` 	| x | x | 2.1.1 	| `npm install socket.io`
-`express`	| x | x | 		| `npm install express`
+`express`	| x | x | 4.16.3 | `npm install express`

@@ -16,7 +16,7 @@ module.exports = function(userList={}) {
 
 	var permissions = {
 		/* A list of the permissions */
-		list: ["view", "rename", "loadCache", "editDeviceKeys", 
+		list: ["view", "rename", "loadCache", "editDevices", 
 			"editPermissions", "createUrlAuth", "removeUrlAuth"],
 	
 		/* The default permissions */
@@ -24,7 +24,7 @@ module.exports = function(userList={}) {
 			view: true,
 			rename: false,
 			loadCache: true,
-			editDeviceKeys: false,
+			editDevices: false,
 			editPermissions: false,
 			createUrlAuth: false,
 			removeUrlAuth: false
@@ -34,7 +34,7 @@ module.exports = function(userList={}) {
 			view: true,
 			rename: true,
 			loadCache: true,
-			editDeviceKeys: true,
+			editDevices: true,
 			editPermissions: true,
 			createUrlAuth: true,
 			removeUrlAuth: true
@@ -44,7 +44,7 @@ module.exports = function(userList={}) {
 			view: false,
 			rename: false,
 			loadCache: false,
-			editDeviceKeys: false,
+			editDevices: false,
 			editPermissions: false,
 			createUrlAuth: false,
 			removeUrlAuth: false

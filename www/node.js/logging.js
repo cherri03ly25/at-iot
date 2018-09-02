@@ -7,7 +7,7 @@
  * logging.js
  * 
  * Created on: 2018-08-29
- * Last Modified: 2018-08-29
+ * Last Modified: 2018-09-02
  * Author(s): Veli-Matti Rantanen
  **/
  
@@ -31,7 +31,7 @@ module.exports = (opt)=>{
 				|| opt.events.includes("Info")
 				|| opt.events.includes(args[0])))
 			{
-				console.log(prefix(args[0]) + args[args.length-1] 
+				console.log(prefix(args[0]) + args[1] 
 							+ postfix(args[0]));
 			}
 		},
@@ -41,7 +41,7 @@ module.exports = (opt)=>{
 				|| opt.events.includes("Warning")
 				|| opt.events.includes(args[0])))
 			{
-				console.log(prefix(args[0]) + args[args.length-1] 
+				console.log(prefix(args[0]) + args[1] 
 							+ postfix(args[0]));
 			}
 		},
@@ -51,7 +51,7 @@ module.exports = (opt)=>{
 				|| opt.events.includes("Error")
 				|| opt.events.includes(args[0])))
 			{
-				console.log(prefix(args[0]) + args[args.length-1] 
+				console.log(prefix(args[0]) + args[1] 
 							+ postfix(args[0]));
 			}
 		}

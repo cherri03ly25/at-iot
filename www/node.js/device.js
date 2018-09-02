@@ -7,7 +7,7 @@
  * device.js
  * 
  * Created on: 2018-08-03
- * Last Modified: 2018-08-29
+ * Last Modified: 2018-09-02
  * Author(s): Veli-Matti Rantanen
  **/
 
@@ -75,6 +75,8 @@ module.exports = function() {
 			dev.devices[mac] = this;
 			dev.deviceList.push(this);
 			dev.emit("DeviceAdded", this);
+			dev.emit("Info", "DeviceAdded", 
+							`Device with mac '${this.mac}' was created.`, this);
 		}
 		
 		/**
@@ -126,16 +128,15 @@ module.exports = function() {
 		/**
 		 *@brief	Validate and update the device counter.
 		 *@detail	Records counter skip and invalid counters.
+		 *@returns	The number that counter was incremented by if valid, otherwise 0.
 		 **/
 		isNextCounter(ctr) {
 			if (this.ctr < ctr) {
-				var skip = ctr - this.ctr - 1;
-				this.log("CTRSkip", skip);
+				var skip = ctr - this.ctr;
 				this.ctr = ctr;
-				return true;
+				return skip;
 			} else {
-				this.log("InvalidCTR");
-				return false;
+				return 0;
 			}
 		}
 		
@@ -156,7 +157,23 @@ module.exports = function() {
 			if(newSensors.length > 0) {
 				this.sensors.push(...newSensors);
 				dev.emit("DeviceUpdated", this);
+				dev.emit("Info", "DeviceUpdated", 
+							`Device with mac '${this.mac}' had ${newSensors.length} new sensors added.`, 
+							this, "sensors", newSensors);
 			}
+		}
+		
+		/**
+		 *@brief	Rename the device.
+		 *
+		 *@param	name		The new name. If null/undefined, the name is set to device mac.
+		 **/
+		rename(name=null) {
+			this.name = name ? name : this.mac;
+			dev.emit("DeviceUpdated", this);
+			dev.emit("Info", "DeviceUpdated", 
+						`Device with mac '${this.mac}' was renamed to '${this.name}'.`, 
+						this, "name", this.name);
 		}
 		
 		/**

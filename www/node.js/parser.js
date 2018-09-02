@@ -13,6 +13,9 @@
  
 const crypto = require("crypto");
 
+/**
+ *	Defines the default values for the sensor fields.
+ **/
 var defaultSensor = {
 	size: 16, signed: false,
 	name: "Unnamed Sensor",
@@ -25,16 +28,29 @@ var sensorTypes = {
 
 module.exports = function(atsb, loadedSensorTypes={}) {
 	/* Helper functions */
+	
+	/**
+	 *@brief	Register a new sensor type.
+	 *
+	 *@param	type		The desired 2-byte hex string to associate with the sensor.
+	 *@param	arr			An array of field objects:
+	 *						{signed:bool, size:int, name:string, precision:float, color:string}
+	 *						Properties can be omitted to use default values.
+	 **/
 	function registerType(type, arr) {
+		/* Check the parameter types */
 		if ((typeof type != "string" || arr.constructor.name != "Array")) 
 			return;
 		
+		/* If sensor doesn't exist, it can be registered */
 		if (!sensorTypes[type])
 		{
 			var length = 0;
 			sensorTypes[type] = [];
-
+			
+			/* Parse the fields */
 			arr.forEach(e=>{
+				/* Override the default values with those in the element */
 				e = {
 					...defaultSensor,
 					...e
@@ -43,12 +59,14 @@ module.exports = function(atsb, loadedSensorTypes={}) {
 				length += e.size;
 			});
 			
+			/* The fields should add up to 32 bits of length. If not, throw an Error.*/
 			if (length != 32) {
 				delete sensorTypes[type];
 				throw new Error("Wrong total size (" + length 
 								+ " bits) for sensor type '"+type+"'."
 								+ " Has to be 32 bits.");
 			}
+		/* If sensor was re-defined, throw an error */
 		} else {
 			throw new Error("Re-definition of sensor type '"+type+"'.");
 		}
@@ -139,9 +157,9 @@ module.exports = function(atsb, loadedSensorTypes={}) {
 		/* Check that the device exists */
 		var dev = atsb.getDevice(msg.mac);
 		if (!dev) {
-			atsb.emit("Warning", "UnknownDeviceWarning", msgId, msg.mac,
-						`Data was received from unknown device '${msg.mac}'.`
-						+ ` (${msgId})`);
+			atsb.emit("Warning", "UnknownDeviceWarning", 
+					`Data was received from unknown device '${msg.mac}'. (${msgId})`,
+					msgId, msg.mac, msg);
 			return;
 		}
 		var key = dev.key;
@@ -149,22 +167,28 @@ module.exports = function(atsb, loadedSensorTypes={}) {
 		/* Authenticate the message */
 		var cpld = msg.data.slice(0,32);
 		
+		dev.log("AllMessages");
+		
 		if (hmac(cpld, key).slice(0,22) != msg.data.slice(32, msg.data.length)) 
 		{
 			/* Authentication failed. Log it. */
-			atsb.emit("Warning", "HMACValidationWarning", msgId,
-				`Received data had invalid HMAC. (${msgId})`);
-			dev.log("InvalidHMAC");
+			atsb.emit("Warning", "HMACValidationWarning", 
+					`Data received from '${msg.mac}' had invalid HMAC. (${msgId})`,
+					msgId, msg.mac, msg);
+			dev.log("InvalidHMACs");
 			return;
 		} else {
 			/* Authentication succeeded, decrypt message. */
 			var pld		= parser.decrypt(cpld, key);
+			
 			/* Check counter */
-			if (!dev.isNextCounter(parseInt(pld.slice(0, 8), 16)))
-			{
-				/* Counter was invalid/duplicate. */
-				atsb.emit("Warning", "CounterValidationWarning", msgId,
-					`Received data had invalid counter. (${msgId})`);
+			var skip = dev.isNextCounter(parseInt(pld.slice(0, 8), 16))
+			if (!skip)
+			{	/* Counter was invalid/duplicate. */
+				dev.log("InvalidCTRs");
+				atsb.emit("Warning", "CounterValidationWarning", 
+						`Data received from '${msg.mac}' had invalid counter. (${msgId})`, 
+						msgId, msg.mac, msg);
 				return;
 			} else {
 				/* Counter was valid. Authentication complete. */						
@@ -184,6 +208,9 @@ module.exports = function(atsb, loadedSensorTypes={}) {
 						time: msg.time
 					});
 				});
+				
+				dev.log("SkippedMessages", skip-1);
+				dev.log("ValidMessages");
 				
 				/* Have the device check if it needs to update */
 				dev.update(...sensors);
