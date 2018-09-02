@@ -97,7 +97,7 @@ setInterval(()=>{
 
 setInterval(()=>{
 		console.log("Current values: [" + 
-			values.map(v=>(parseHex(v) + " (" + Math.round(v) + ")")).join(", ") + "]")
+		values.map(v=>(parseHex(v) + " (" + Math.round(v) + ")")).join(", ") + "]")
 	}, 15000);
 			
 console.log("Simulating a broadcasting device.");

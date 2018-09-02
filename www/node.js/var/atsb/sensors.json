@@ -50,7 +50,11 @@
 			},{
 				"size": 8, "name": "APDS Gesture", "style": "orange"
 			}],
-			
+	
+	"FFFE": [{	"signed": true, "name": "Test Sensor #3", "style": "orange"
+			},{
+				"signed": true, "name": "Test Sensor #4", "style": "green"
+			}],
 	"FFFF": [{	
 				"signed": true,	"name": "Test Sensor #1", "style": "red"
 			},{	
