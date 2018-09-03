@@ -25,7 +25,7 @@ Due to the short amount of time available for this project, server installation 
 ### Dependencies
 
 Dependency | Required | Recommended | Version | Install Command
-----------:|:--------:|:-------:|:----------------
+----------:|:--------:|:-----------:|:-------:|:----------------
 `node.js` 	| x | x | v8.10.0 	| `sudo apt install nodejs`
 `npm` 		|   | x | 3.5.2 	| `sudo apt install npm`
 `pm2` 		|   | x | 2.10.4 	| `sudo npm install -g pm2`
